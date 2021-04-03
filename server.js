@@ -14,7 +14,6 @@ const app = express()
 
 // Basic Configuration
 const port = process.env.PORT || 3000
-const shortenedUrls = {}
 /** this project needs a db !! **/
 const urlencodedParser = bodyParser.urlencoded({extended: false})
 
@@ -53,7 +52,7 @@ app.post('/api/shorturl/new', function (req, res) {
     const regex = /^(http(s)?:\/\/)[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/g
     const url = req.body.url
     if (!regex.test(url)) {
-        res.status(401)
+        // res.status(401)
         return res.send({error: 'invalid url'})
     }
 
@@ -67,7 +66,7 @@ app.post('/api/shorturl/new', function (req, res) {
             dns.lookup(url.split('//')[1], function (err, address, family) {
                 console.log('family', family)
                 if (!family || err) {
-                    res.status(401)
+                    // res.status(401)
                     res.send({error: 'Invalid hostname'})
                 } else {
                     UrlModel.estimatedDocumentCount((err, count) => {
