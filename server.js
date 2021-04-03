@@ -63,10 +63,9 @@ app.post('/api/shorturl/new', function (req, res) {
                 short_url: doc.short_url,
             })
         } else {
-            dns.lookup(url.split('//')[1], function (err, address, family) {
-                console.log('family', family)
+            const hostname = url.replace(/http[s]?\:\/\//, '').replace(/\/(.+)?/, '')
+            dns.lookup(hostname, function (err, address, family) {
                 if (!family || err) {
-                    // res.status(401)
                     res.send({error: 'Invalid hostname'})
                 } else {
                     UrlModel.estimatedDocumentCount((err, count) => {
