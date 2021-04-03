@@ -5,18 +5,35 @@ var mongo = require('mongodb')
 var mongoose = require('mongoose')
 var bodyParser = require('body-parser')
 const dns = require('dns')
+const dotenv = require('dotenv');
+dotenv.config();
 
-var cors = require('cors')
+const cors = require('cors')
 
-var app = express()
+const app = express()
 
-let index = 1
+
 // Basic Configuration
-var port = process.env.PORT || 3000
+const port = process.env.PORT || 3000
 const shortenedUrls = {}
 /** this project needs a db !! **/
-// mongoose.connect(process.env.MONGOLAB_URI);
-var urlencodedParser = bodyParser.urlencoded({extended: false})
+const urlencodedParser = bodyParser.urlencoded({extended: false})
+
+
+const urlSchema = new mongoose.Schema({
+    original_url: { type: String, required: true},
+    short_url: { type: String }
+})
+
+mongoose.connect(process.env.MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true});
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function() {
+    // we're connected!
+    console.log('connected' )
+});
+
+const UrlModel = mongoose.model('Url', urlSchema)
 
 app.use(cors())
 app.use(urlencodedParser)
@@ -36,35 +53,50 @@ app.get('/api/hello', function (req, res) {
 
 app.post('/api/shorturl/new', function (req, res) {
     const regex = /^(http(s)?:\/\/)[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/g
-    if (!regex.test(req.body.url)) {
-        res.send({error: 'invalid URL'})
+    const url = req.body.url
+    if (!regex.test(url)) {
+        res.status(401)
+        return res.send({error: 'invalid URL'})
     }
 
-    console.log('req.body', req.body)
+    UrlModel.findOne({original_url: url}, (err, doc) => {
+        if (doc) {
+            res.send({
+                original_url: url,
+                short_url: doc.short_url
+            })
+        } else {
+            dns.lookup(url.split('//')[1], function (err, address, family) {
+                console.log('family', family )
+                if (!family || err) {
+                    res.status(401)
+                    res.send({error: 'Invalid hostname'})
+                } else {
+                    UrlModel.estimatedDocumentCount((err, count) => {
+                        if (err) {
+                            res.send('Something is wrong at counting the url. Please try again!')
+                        }
+                        const newUrl = new UrlModel({
+                            original_url: url,
+                            short_url: count + 1,
+                        })
 
-    const isUrlShorten = Object.values(shortenedUrls)
-        .map((obj) => obj.original_url)
-        .includes(req.body.url)
-    if (isUrlShorten) {
-        res.send({
-            original_url: req.body.url,
-            short_url: index - 1,
-        })
-    } else {
-        dns.lookup(req.body.url.split('//')[1], function (err, address, family) {
-            if (family) {
-                const resObj = {
-                    original_url: req.body.url,
-                    short_url: index,
+                        newUrl.save((err, savedDoc) => {
+                            if (err) {
+                                res.send('Something is wrong at saving the url. Please try again!')
+                            }
+                            res.send({
+                                original_url: savedDoc.original_url,
+                                short_url: savedDoc.short_url,
+                            })
+                        })
+                    })
                 }
-                res.send(resObj)
-                shortenedUrls[index] = {
-                    ...resObj
-                }
-                index++
-            }
-        })
-    }
+            })
+
+        }
+
+    })
 })
 
 app.get('/api/shorturl/:id', (req, res) => {
