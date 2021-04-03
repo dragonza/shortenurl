@@ -5,13 +5,12 @@ var mongo = require('mongodb')
 var mongoose = require('mongoose')
 var bodyParser = require('body-parser')
 const dns = require('dns')
-const dotenv = require('dotenv');
-dotenv.config();
+const dotenv = require('dotenv')
+dotenv.config()
 
 const cors = require('cors')
 
 const app = express()
-
 
 // Basic Configuration
 const port = process.env.PORT || 3000
@@ -19,19 +18,18 @@ const shortenedUrls = {}
 /** this project needs a db !! **/
 const urlencodedParser = bodyParser.urlencoded({extended: false})
 
-
 const urlSchema = new mongoose.Schema({
-    original_url: { type: String, required: true},
-    short_url: { type: String }
+    original_url: {type: String, required: true},
+    short_url: {type: String},
 })
 
-mongoose.connect(process.env.MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true});
-const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function() {
+mongoose.connect(process.env.MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true})
+const db = mongoose.connection
+db.on('error', console.error.bind(console, 'connection error:'))
+db.once('open', function () {
     // we're connected!
-    console.log('connected' )
-});
+    console.log('connected')
+})
 
 const UrlModel = mongoose.model('Url', urlSchema)
 
@@ -56,18 +54,18 @@ app.post('/api/shorturl/new', function (req, res) {
     const url = req.body.url
     if (!regex.test(url)) {
         res.status(401)
-        return res.send({error: 'invalid URL'})
+        return res.send({error: 'invalid url'})
     }
 
     UrlModel.findOne({original_url: url}, (err, doc) => {
         if (doc) {
             res.send({
                 original_url: url,
-                short_url: doc.short_url
+                short_url: doc.short_url,
             })
         } else {
             dns.lookup(url.split('//')[1], function (err, address, family) {
-                console.log('family', family )
+                console.log('family', family)
                 if (!family || err) {
                     res.status(401)
                     res.send({error: 'Invalid hostname'})
@@ -93,20 +91,18 @@ app.post('/api/shorturl/new', function (req, res) {
                     })
                 }
             })
-
         }
-
     })
 })
 
 app.get('/api/shorturl/:id', (req, res) => {
     const id = req.params.id
-    const isIdExisted = Object.keys(shortenedUrls).includes(id)
-    if (isIdExisted) {
-        res.redirect(shortenedUrls[id].original_url)
-    } else {
-        res.send({error: 'invalid URL'})
-    }
+    UrlModel.findOne({short_url: id}, (err, doc) => {
+        if (!doc) {
+            return res.send({error: 'invalid url'})
+        }
+        res.redirect(doc.original_url)
+    })
 })
 
 app.listen(port, function () {
